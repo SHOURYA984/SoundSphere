@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create account — SoundSphere</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <section class="card auth-card">
+      <a class="brand" href="index.html">Sound<span>Sphere</span></a>
+      <div class="eyebrow">Join the community</div>
+      <h1 class="h1">Create your artist account</h1>
+      <form id="register">
+        <div class="field">
+          <label for="name">Full name</label>
+          <input id="name" name="name" type="text" required minlength="2" maxlength="120" placeholder="e.g. Maya Lin" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required placeholder="you@domain.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="password">Password (10+ characters)</label>
+          <input id="password" name="password" type="password" required minlength="10" placeholder="At least 10 characters" autocomplete="new-password">
+        </div>
+        <button type="submit">Create account</button>
+        <div id="msg" class="error"></div>
+      </form>
+      <p class="muted">Already registered? <a href="login.html">Sign in</a></p>
+    </section>
+  </div>
+  <script src="assets/js/app.js"></script>
+  <script>
+    document.querySelector('#register').onsubmit = async e => {
+      e.preventDefault();
+      const msg = document.querySelector('#msg');
+      msg.textContent = '';
+      const b = e.submitter || e.target.querySelector('button[type="submit"]');
+      if (b) b.disabled = true;
+      try {
+        await request('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify(formDataObject(e.target))
+        });
+        location.href = 'musician-dashboard.html';
+      } catch (x) {
+        msg.textContent = x.message;
+      } finally {
+        if (b) b.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>

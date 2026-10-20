@@ -1,0 +1,120 @@
+CREATE DATABASE IF NOT EXISTS soundsphere_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+USE soundsphere_db;
+
+CREATE TABLE IF NOT EXISTS users (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT,
+ name VARCHAR(120) NOT NULL,
+ email VARCHAR(254) NOT NULL UNIQUE,
+ password_hash VARCHAR(100) NOT NULL,
+ role ENUM('ADMIN','MUSICIAN') NOT NULL DEFAULT 'MUSICIAN',
+ status ENUM('ACTIVE','DISABLED') NOT NULL DEFAULT 'ACTIVE',
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS user_profiles (
+ user_id BIGINT PRIMARY KEY,
+ bio TEXT, genres VARCHAR(500), instruments VARCHAR(500), avatar_storage_name VARCHAR(255),
+ social_links VARCHAR(1000),
+ CONSTRAINT fk_profile_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS projects (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, title VARCHAR(180) NOT NULL, description TEXT,
+ owner_id BIGINT NOT NULL, deadline DATE NULL,
+ status ENUM('PLANNING','IN_PROGRESS','ON_HOLD','COMPLETED') NOT NULL DEFAULT 'PLANNING',
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ CONSTRAINT fk_project_owner FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE RESTRICT,
+ INDEX idx_project_owner(owner_id), INDEX idx_project_status(status)
+);
+CREATE TABLE IF NOT EXISTS project_members (
+ project_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+ member_role ENUM('OWNER','EDITOR','VIEWER') NOT NULL DEFAULT 'EDITOR',
+ joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(project_id,user_id),
+ FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS project_messages (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, project_id BIGINT NOT NULL, author_id BIGINT NOT NULL,
+ message TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+ FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE RESTRICT, INDEX idx_messages_project(project_id,id)
+);
+CREATE TABLE IF NOT EXISTS project_tasks (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, project_id BIGINT NOT NULL, title VARCHAR(180) NOT NULL,
+ description TEXT, assignee_id BIGINT NULL, due_date DATE NULL,
+ priority ENUM('LOW','MEDIUM','HIGH') NOT NULL DEFAULT 'MEDIUM',
+ status ENUM('TODO','IN_PROGRESS','DONE') NOT NULL DEFAULT 'TODO',
+ created_by BIGINT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+ FOREIGN KEY(assignee_id) REFERENCES users(id) ON DELETE SET NULL,
+ FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+CREATE TABLE IF NOT EXISTS music_files (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, owner_id BIGINT NOT NULL, project_id BIGINT NULL,
+ title VARCHAR(180) NOT NULL, description TEXT, original_name VARCHAR(255) NOT NULL,
+ storage_name VARCHAR(255) NOT NULL UNIQUE, mime_type VARCHAR(120) NOT NULL,
+ size_bytes BIGINT NOT NULL, moderation_status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
+ rejection_reason VARCHAR(500), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE RESTRICT,
+ FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
+ INDEX idx_music_owner(owner_id), INDEX idx_music_status(moderation_status)
+);
+CREATE TABLE IF NOT EXISTS music_file_comments (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, file_id BIGINT NOT NULL, author_id BIGINT NOT NULL,
+ comment_text TEXT NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(file_id) REFERENCES music_files(id) ON DELETE CASCADE,
+ FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE RESTRICT
+);
+CREATE TABLE IF NOT EXISTS music_file_versions (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, file_id BIGINT NOT NULL, version_number INT NOT NULL,
+ storage_name VARCHAR(255) NOT NULL UNIQUE, uploaded_by BIGINT NOT NULL, change_notes VARCHAR(500),
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_file_version(file_id,version_number),
+ FOREIGN KEY(file_id) REFERENCES music_files(id) ON DELETE CASCADE,
+ FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+CREATE TABLE IF NOT EXISTS portfolio_items (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, owner_id BIGINT NOT NULL, music_file_id BIGINT NULL,
+ item_type ENUM('SONG','ALBUM') NOT NULL DEFAULT 'SONG', title VARCHAR(180) NOT NULL,
+ description TEXT, genre VARCHAR(100), release_date DATE NULL, visibility ENUM('PUBLIC','PRIVATE') NOT NULL DEFAULT 'PRIVATE',
+ moderation_status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
+ rejection_reason VARCHAR(500), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE RESTRICT,
+ FOREIGN KEY(music_file_id) REFERENCES music_files(id) ON DELETE SET NULL,
+ INDEX idx_portfolio_public(visibility,moderation_status)
+);
+CREATE TABLE IF NOT EXISTS portfolio_collaborators (
+ portfolio_item_id BIGINT NOT NULL, user_id BIGINT NOT NULL, credit VARCHAR(120),
+ PRIMARY KEY(portfolio_item_id,user_id),
+ FOREIGN KEY(portfolio_item_id) REFERENCES portfolio_items(id) ON DELETE CASCADE,
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS content_moderation (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, content_type ENUM('MUSIC_FILE','PORTFOLIO_ITEM','COMMENT') NOT NULL,
+ content_id BIGINT NOT NULL, admin_id BIGINT NOT NULL, decision ENUM('APPROVED','REJECTED','REMOVED') NOT NULL,
+ reason VARCHAR(500), created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(admin_id) REFERENCES users(id) ON DELETE RESTRICT
+);
+CREATE TABLE IF NOT EXISTS notifications (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, user_id BIGINT NOT NULL, title VARCHAR(180) NOT NULL,
+ body VARCHAR(1000) NOT NULL, target_url VARCHAR(500), is_read BOOLEAN NOT NULL DEFAULT FALSE,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, INDEX idx_notice_user(user_id,is_read,created_at)
+);
+CREATE TABLE IF NOT EXISTS activity_logs (
+ id BIGINT PRIMARY KEY AUTO_INCREMENT, actor_id BIGINT NULL, event_type VARCHAR(80) NOT NULL,
+ description VARCHAR(1000) NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(actor_id) REFERENCES users(id) ON DELETE SET NULL, INDEX idx_activity_created(created_at)
+);
+CREATE TABLE IF NOT EXISTS system_settings (
+ setting_key VARCHAR(100) PRIMARY KEY, setting_value VARCHAR(2000) NOT NULL,
+ updated_by BIGINT NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY(updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+INSERT IGNORE INTO system_settings(setting_key,setting_value) VALUES
+ ('platform_name','SoundSphere'),('platform_description','Create music together.'),
+ ('max_upload_mb','25'),('allowed_audio_extensions','mp3,wav,ogg,m4a'),
+ ('portfolio_requires_approval','true'),('comments_enabled','true'),
+ ('registration_enabled','true'),('notifications_enabled','true'),('maintenance_mode','false');

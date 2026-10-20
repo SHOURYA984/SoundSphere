@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in — SoundSphere</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <section class="card auth-card">
+      <a class="brand" href="index.html">Sound<span>Sphere</span></a>
+      <div class="eyebrow">Welcome back</div>
+      <h1 class="h1">Sign in to your studio</h1>
+      <p class="muted">Your projects and collaborators are waiting.</p>
+      <form id="login">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required placeholder="you@domain.com" autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required placeholder="Your password" autocomplete="current-password">
+        </div>
+        <button type="submit">Sign in</button>
+        <div id="msg" class="error"></div>
+      </form>
+      <p class="muted">New to SoundSphere? <a href="register.html">Create an account</a></p>
+    </section>
+  </div>
+  <script src="assets/js/app.js"></script>
+  <script>
+    document.querySelector('#login').onsubmit = async e => {
+      e.preventDefault();
+      const msg = document.querySelector('#msg');
+      msg.textContent = '';
+      const b = e.submitter || e.target.querySelector('button[type="submit"]');
+      if (b) b.disabled = true;
+      try {
+        const d = await request('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify(formDataObject(e.target))
+        });
+        location.href = d.role === 'ADMIN' ? 'admin-dashboard.html' : 'musician-dashboard.html';
+      } catch (x) {
+        msg.textContent = x.message;
+      } finally {
+        if (b) b.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
